@@ -1,0 +1,57 @@
+{
+  "fit_s1": 8000,
+  "calibration_s1": 2000,
+  "audit_s1": 2000,
+  "fit_pairs": 1743947,
+  "fit_positives": 26428,
+  "threshold": 0.76,
+  "calibration_macro_f0_5": 0.9413763074635864,
+  "trials": [
+    {
+      "leaves": 31,
+      "iterations": 700,
+      "calibration_f0_5": 0.9413763074635864,
+      "threshold": 0.76
+    },
+    {
+      "leaves": 63,
+      "iterations": 668,
+      "calibration_f0_5": 0.9404318335367532,
+      "threshold": 0.775
+    }
+  ],
+  "audit": {
+    "macro_f0_5": 0.9467387533390624,
+    "query_count": 2000,
+    "true_positives": 6066,
+    "false_positives": 72,
+    "false_negatives": 815,
+    "micro_precision": 0.9882697947214076,
+    "micro_recall": 0.881557913094027
+  },
+  "seconds": 211.5470000000205,
+  "audit_singletons": {
+    "count": 109,
+    "correct": 104
+  },
+  "audit_by_country": {
+    "India": {
+      "macro_f0_5": 0.9250067052705041,
+      "query_count": 813,
+      "true_positives": 2346,
+      "false_positives": 43,
+      "false_negatives": 459,
+      "micro_precision": 0.9820008371703641,
+      "micro_recall": 0.8363636363636363
+    },
+    "US": {
+      "macro_f0_5": 0.9616234669698441,
+      "query_count": 1187,
+      "true_positives": 3720,
+      "false_positives": 29,
+      "false_negatives": 356,
+      "micro_precision": 0.9922646038943719,
+      "micro_recall": 0.9126594700686947
+    }
+  }
+}

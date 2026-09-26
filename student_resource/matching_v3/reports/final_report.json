@@ -1,0 +1,87 @@
+{
+  "previous_model_same_audit": {
+    "macro_f0_5": 0.9106358784926168,
+    "query_count": 2000,
+    "true_positives": 5743,
+    "false_positives": 213,
+    "false_negatives": 1138,
+    "micro_precision": 0.9642377434519812,
+    "micro_recall": 0.834617061473623
+  },
+  "delivered_model": {
+    "selection": "Pool 300 selected on calibration speed with an allowed 0.002 absolute macro F0.5 loss; audit not used for selection.",
+    "audit": {
+      "macro_f0_5": 0.94543687198287,
+      "query_count": 2000,
+      "true_positives": 6056,
+      "false_positives": 76,
+      "false_negatives": 825,
+      "micro_precision": 0.9876060013046314,
+      "micro_recall": 0.8801046359540764
+    },
+    "singletons": {
+      "count": 109,
+      "correct": 103
+    },
+    "audit_by_country": {
+      "India": {
+        "macro_f0_5": 0.9241128774418869,
+        "query_count": 813,
+        "true_positives": 2340,
+        "false_positives": 44,
+        "false_negatives": 465,
+        "micro_precision": 0.9815436241610739,
+        "micro_recall": 0.8342245989304813
+      },
+      "US": {
+        "macro_f0_5": 0.9600421016052958,
+        "query_count": 1187,
+        "true_positives": 3716,
+        "false_positives": 32,
+        "false_negatives": 360,
+        "micro_precision": 0.991462113127001,
+        "micro_recall": 0.9116781157998037
+      }
+    },
+    "blocking_pair_recall": 0.953059148379596
+  },
+  "runtime": {
+    "sample": "uniform reservoir over all test S1; seed 816",
+    "test_population": 1732544,
+    "sample_countries": {
+      "India": 4658,
+      "US": 3849,
+      "France": 1493
+    },
+    "benchmark": {
+      "s1_records": 10000,
+      "candidate_pairs": 2183689,
+      "matches": 31621,
+      "new_s1_this_run": 10000,
+      "seconds_this_run": 136.7970000000205,
+      "partial": true,
+      "split": "test"
+    },
+    "queries_per_second": 73.10101829717394,
+    "linear_full_run_hours": 6.58352282133432,
+    "planning_range_hours": [
+      6,
+      8
+    ],
+    "includes": "Query reading, blocking, two-stage scoring, candidate/match shard writing and merging. Existing indexes/caches reused.",
+    "excludes": "One-time cache copy, final official validation, and any slowdown from laptop sleep or competing workloads.",
+    "under_30_minutes_achieved": false
+  },
+  "verification": [
+    "Four unit tests passed through the actual PowerShell runner.",
+    "Compact records matched the original SQLite values on 1000 sampled records.",
+    "Vectorized retrieval produced exactly the same candidate order for 2000 audit S1 at pool 1000.",
+    "The cascade preserved every final audit prediction at pool 1000.",
+    "The delivered pool 300 was selected using calibration, then evaluated separately on the audit."
+  ],
+  "limitations": [
+    "This is a training-data audit, not a leaderboard result.",
+    "France has no labeled accuracy validation.",
+    "Normalization limitations and sparse feature experiment are documented in the README."
+  ]
+}

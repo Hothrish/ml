@@ -1,0 +1,37 @@
+{
+  "selection": "Pool 300 selected on calibration speed with an allowed 0.002 absolute macro F0.5 loss; audit not used for selection.",
+  "audit": {
+    "macro_f0_5": 0.94543687198287,
+    "query_count": 2000,
+    "true_positives": 6056,
+    "false_positives": 76,
+    "false_negatives": 825,
+    "micro_precision": 0.9876060013046314,
+    "micro_recall": 0.8801046359540764
+  },
+  "singletons": {
+    "count": 109,
+    "correct": 103
+  },
+  "audit_by_country": {
+    "India": {
+      "macro_f0_5": 0.9241128774418869,
+      "query_count": 813,
+      "true_positives": 2340,
+      "false_positives": 44,
+      "false_negatives": 465,
+      "micro_precision": 0.9815436241610739,
+      "micro_recall": 0.8342245989304813
+    },
+    "US": {
+      "macro_f0_5": 0.9600421016052958,
+      "query_count": 1187,
+      "true_positives": 3716,
+      "false_positives": 32,
+      "false_negatives": 360,
+      "micro_precision": 0.991462113127001,
+      "micro_recall": 0.9116781157998037
+    }
+  },
+  "blocking_pair_recall": 0.953059148379596
+}

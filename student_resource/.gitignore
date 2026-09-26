@@ -1,0 +1,29 @@
+@"
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments / bundled dependencies
+.matching_deps/
+.venv/
+venv/
+env/
+
+# Generated output
+output/
+output_v3/
+runs/
+*.partial
+
+# Temporary files
+*.tmp
+*.log
+
+# OS/editor files
+.DS_Store
+.vscode/
+.idea/
+"@ | Set-Content .gitignore
+data/
+dataset/

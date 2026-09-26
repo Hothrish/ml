@@ -1,0 +1,15 @@
+{
+  "pool": 300,
+  "seconds": 30.406999999890104,
+  "pairs": 435929,
+  "threshold": 0.745,
+  "calibration": {
+    "macro_f0_5": 0.9400471810039706,
+    "query_count": 2000,
+    "true_positives": 6129,
+    "false_positives": 112,
+    "false_negatives": 801,
+    "micro_precision": 0.982054157987502,
+    "micro_recall": 0.8844155844155844
+  }
+}

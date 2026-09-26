@@ -1,0 +1,55 @@
+{
+  "model": "NumPy logistic regression with nonlinear comparison features",
+  "fit_s1": 2100,
+  "threshold_s1": 450,
+  "audit_s1": 450,
+  "fit_pairs": 69569,
+  "fit_positive_pairs": 6569,
+  "all_candidate_pairs": 499535,
+  "threshold": 0.89,
+  "threshold_selection_macro_f0_5": 0.8629239999190244,
+  "audit": {
+    "macro_f0_5": 0.865034952333431,
+    "query_count": 450,
+    "true_positives": 1247,
+    "false_positives": 83,
+    "false_negatives": 287,
+    "micro_precision": 0.937593984962406,
+    "micro_recall": 0.8129074315514994
+  },
+  "audit_by_country": {
+    "India": {
+      "macro_f0_5": 0.8162001675094062,
+      "query_count": 173,
+      "true_positives": 449,
+      "false_positives": 53,
+      "false_negatives": 123,
+      "micro_precision": 0.8944223107569721,
+      "micro_recall": 0.784965034965035
+    },
+    "US": {
+      "macro_f0_5": 0.8955346554906739,
+      "query_count": 277,
+      "true_positives": 798,
+      "false_positives": 30,
+      "false_negatives": 164,
+      "micro_precision": 0.9637681159420289,
+      "micro_recall": 0.8295218295218295
+    }
+  },
+  "audit_blocking_oracle": {
+    "macro_f0_5": 0.9743970753186967,
+    "query_count": 450,
+    "true_positives": 1423,
+    "false_positives": 0,
+    "false_negatives": 111,
+    "micro_precision": 1.0,
+    "micro_recall": 0.9276401564537158
+  },
+  "seconds": 118.23400000017136,
+  "limitations": [
+    "Audit is a small training-data estimate, not a test leaderboard score.",
+    "France has no labeled training examples.",
+    "Features use character/token overlap, phonetics and numbers; full edit-distance/TF-IDF features are not included."
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "sample": "first 50000 train S1 rows; diagnostic, not an accuracy estimate",
+  "counts": {
+    "rows": 50000,
+    "addresses_with_separate_landmarks": 2722,
+    "nonempty_address_becomes_empty_body": 0,
+    "empty_name_core": 0
+  },
+  "synthetic_examples": [
+    {
+      "input": {
+        "name": "Example Ltd",
+        "address": "Near market, 12 Main Road, Delhi",
+        "country": "India"
+      },
+      "output": {
+        "country_norm": "India",
+        "name_norm": "example ltd",
+        "name_core": "example",
+        "name_sorted": "example",
+        "name_nospace": "example",
+        "name_acronym": "e",
+        "name_translit": "",
+        "name_phon": "example",
+        "name_cons": "axmpl",
+        "name_legal": "ltd",
+        "name_nums": "",
+        "name_script": "latin",
+        "name_is_domain": "0",
+        "addr_norm": "12 main road",
+        "addr_core": "12 main dl",
+        "addr_sorted": "12 dl main",
+        "addr_cons": "mn dl",
+        "addr_nums": "12",
+        "addr_house": "12",
+        "addr_postcode": "",
+        "addr_region": "dl",
+        "addr_locality": "12 main road",
+        "addr_landmark": "near market",
+        "addr_street": "main dl"
+      }
+    },
+    {
+      "input": {
+        "name": "Example SAS",
+        "address": "12 rue principale, 02100",
+        "country": "France"
+      },
+      "output": {
+        "country_norm": "France",
+        "name_norm": "example sas",
+        "name_core": "example",
+        "name_sorted": "example",
+        "name_nospace": "example",
+        "name_acronym": "e",
+        "name_translit": "",
+        "name_phon": "example",
+        "name_cons": "axmpl",
+        "name_legal": "sas",
+        "name_nums": "",
+        "name_script": "latin",
+        "name_is_domain": "0",
+        "addr_norm": "12 rue principale 2100",
+        "addr_core": "12 principale 2100",
+        "addr_sorted": "12 2100 principale",
+        "addr_cons": "prnspl",
+        "addr_nums": "12 2100",
+        "addr_house": "12",
+        "addr_postcode": "",
+        "addr_region": "",
+        "addr_locality": "2100",
+        "addr_landmark": "",
+        "addr_street": "principale"
+      }
+    },
+    {
+      "input": {
+        "name": "Example Inc",
+        "address": "12 Main St, Boston, MA, 02108",
+        "country": "US"
+      },
+      "output": {
+        "country_norm": "US",
+        "name_norm": "example inc",
+        "name_core": "example",
+        "name_sorted": "example",
+        "name_nospace": "example",
+        "name_acronym": "e",
+        "name_translit": "",
+        "name_phon": "example",
+        "name_cons": "axmpl",
+        "name_legal": "inc",
+        "name_nums": "",
+        "name_script": "latin",
+        "name_is_domain": "0",
+        "addr_norm": "12 main street boston 2108",
+        "addr_core": "12 main boston 2108 ma",
+        "addr_sorted": "12 2108 boston ma main",
+        "addr_cons": "mn pstn m",
+        "addr_nums": "12 2108",
+        "addr_house": "12",
+        "addr_postcode": "",
+        "addr_region": "ma",
+        "addr_locality": "boston",
+        "addr_landmark": "",
+        "addr_street": "main ma"
+      }
+    }
+  ],
+  "findings": [
+    "The existing normalization already streams compressed parts with multiple processes.",
+    "Unknown countries are retained and France has explicit aliases/address rules.",
+    "Landmarks are preserved separately but current matching does not use this column.",
+    "basic_clean removes leading zeros before fixed-width postcode extraction, so zero-prefixed US/French postcodes can be missed.",
+    "name_norm and name_legal preserve legal-form information separately from name_core.",
+    "No existing normalized files or index inputs were changed: doing so requires retraining and revalidating retrieval."
+  ]
+}

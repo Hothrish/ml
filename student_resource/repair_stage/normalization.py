@@ -1,0 +1,823 @@
+"""
+normalization.py -- name, address and country normalisation for the ML
+Challenge 2026 Business Entity Resolution dataset.
+
+Stdlib only. No network, no external data source, no geocoding: every table
+here is a generic orthographic/abbreviation table of the kind used for plain
+text normalisation, or is mined from the challenge data itself
+(see `load_derived`).
+
+Public API
+----------
+    normalize_name(raw, country)     -> dict of name representations
+    normalize_address(raw, country)  -> dict of address representations
+    normalize_country(raw)           -> canonical country label
+    normalize_record(name, addr, c)  -> all of the above, merged
+    normalize_file(src, out_dir)     -> parallel run over one source file
+
+CLI
+---
+    python src/normalization.py --in dataset/train/*.tsv --out data/normalized
+    python src/normalization.py --report normalization_report.json
+
+WHY SEVERAL REPRESENTATIONS INSTEAD OF ONE CANONICAL STRING
+-----------------------------------------------------------
+No single normalisation survives every noise pattern in this data at once.
+Dropping street types fixes Rd/Road/Saint but throws away signal; stripping
+vowels defeats transliteration but collides more; sorting tokens fixes word
+order but loses it as evidence. Each field is therefore emitted at several
+levels of aggression and the matcher downstream picks which view to trust.
+"""
+from __future__ import annotations
+
+import argparse
+import gzip
+import json
+import multiprocessing as mp
+import os
+import random
+import re
+import sys
+import time
+from collections import Counter
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from script_classifier import (consonant_skeleton, fold_unicode,  # noqa: E402
+                               phonetic, script_distribution, script_of,
+                               transliterate)
+
+# ===========================================================================
+# PART 1 -- LOOKUP TABLES
+# ===========================================================================
+
+# Legal forms, applied in order on the punctuation-stripped, lower-cased name.
+# Multi-word forms must precede the single words they contain ("private
+# limited" before "limited"), so this is an ordered list, not a dict.
+LEGAL_FORMS = [
+    # --- India -------------------------------------------------------------
+    (r"\bprivate limited\b", "pvtltd"), (r"\bprivate ltd\b", "pvtltd"),
+    (r"\bpvt limited\b", "pvtltd"), (r"\bpvt ltd\b", "pvtltd"),
+    (r"\bp ltd\b", "pvtltd"), (r"\bpvt\b", "pvtltd"),
+    (r"\bpublic limited\b", "ltd"),
+    # --- US / generic ------------------------------------------------------
+    (r"\blimited liability company\b", "llc"),
+    (r"\blimited liability partnership\b", "llp"),
+    (r"\bl l c\b", "llc"), (r"\bl l p\b", "llp"),
+    (r"\bincorporated\b", "inc"), (r"\bincorp\b", "inc"),
+    (r"\bcorporations\b", "corp"), (r"\bcorporation\b", "corp"),
+    (r"\bcorpn\b", "corp"), (r"\bcompany\b", "co"), (r"\bcompanies\b", "co"),
+    (r"\bcooperative\b", "coop"), (r"\bco operative\b", "coop"),
+    (r"\bsole proprietorship\b", "prop"), (r"\bproprietorship\b", "prop"),
+    (r"\blimited\b", "ltd"),
+    # --- France ------------------------------------------------------------
+    (r"\bsociete a responsabilite limitee\b", "sarl"), (r"\bs a r l\b", "sarl"),
+    (r"\bsociete par actions simplifiee unipersonnelle\b", "sasu"),
+    (r"\bsociete par actions simplifiee\b", "sas"), (r"\bs a s\b", "sas"),
+    (r"\bsociete civile immobiliere\b", "sci"),
+    (r"\bsociete civile professionnelle\b", "scp"),
+    (r"\bentreprise unipersonnelle a responsabilite limitee\b", "eurl"),
+    (r"\bsociete anonyme\b", "sa"),
+    (r"\bsociete en nom collectif\b", "snc"),
+    (r"\bgroupement d interet economique\b", "gie"),
+    (r"\bassociation\b", "assoc"), (r"\betablissement\b", "etab"),
+]
+LEGAL_FORMS_RE = [(re.compile(p), r) for p, r in LEGAL_FORMS]
+
+# Tokens dropped to form the *core* name. A name is never reduced to nothing:
+# if every token is a legal form, the full normalised name is kept instead.
+SUFFIX_TOKENS = frozenset("""
+inc corp llc llp ltd pvtltd co coop prop plc pllc lp pc
+sarl sasu sas sci scp eurl sa snc gie assoc etab scop scic sem
+gmbh bv nv ag srl spa oy ab as
+""".split())
+
+_COMMON_ABBREV = {
+    "rd": "road", "st": "street", "str": "street", "ste": "suite",
+    "ave": "avenue", "aven": "avenue", "blvd": "boulevard", "blv": "boulevard",
+    "dr": "drive", "ln": "lane", "ct": "court", "cir": "circle",
+    "pl": "place", "plz": "plaza", "sq": "square", "ter": "terrace",
+    "terr": "terrace", "pkwy": "parkway", "pky": "parkway", "pwy": "parkway",
+    "hwy": "highway", "expy": "expressway", "fwy": "freeway", "trl": "trail",
+    "cres": "crescent", "hts": "heights", "mnr": "manor", "vlg": "village",
+    "apt": "apartment", "bldg": "building", "flr": "floor", "fl": "floor",
+    "rm": "room", "nos": "number", "opp": "opposite", "nr": "near",
+    "ext": "extension", "extn": "extension", "mkt": "market", "blk": "block",
+}
+_US_ABBREV = {
+    "n": "north", "s": "south", "e": "east", "w": "west",
+    "ne": "northeast", "nw": "northwest", "se": "southeast", "sw": "southwest",
+    "tr": "trail", "twp": "township", "po": "postoffice", "rte": "route",
+}
+_IN_ABBREV = {
+    "tq": "taluk", "tal": "taluk", "dist": "district", "distt": "district",
+    "kh": "khasra", "sec": "sector", "phse": "phase", "ind": "industrial",
+    "estt": "estate", "gf": "groundfloor", "ps": "policestation",
+    "po": "postoffice", "vill": "village", "mg": "marg",
+}
+_FR_ABBREV = {
+    "r": "rue", "av": "avenue", "bd": "boulevard", "bld": "boulevard",
+    "all": "allee", "imp": "impasse", "ch": "chemin", "rte": "route",
+    "crs": "cours", "res": "residence", "bat": "batiment",
+    "zi": "zoneindustrielle", "za": "zoneartisanale", "lot": "lotissement",
+    "sq": "square", "chem": "chemin", "espl": "esplanade",
+}
+ABBREV_BY_COUNTRY = {
+    "US": {**_COMMON_ABBREV, **_US_ABBREV},
+    "India": {**_COMMON_ABBREV, **_IN_ABBREV},
+    "France": {**_COMMON_ABBREV, **_FR_ABBREV},
+}
+DEFAULT_ABBREV = _COMMON_ABBREV
+
+# Generic words dropped from the address *core*. Removing the street type
+# outright is what neutralises Rd/Road, St/Street and the over-expanded "Saint"
+# seen in this data -- the discriminative content is the house number plus the
+# proper nouns.
+STREET_TYPES = frozenset("""
+road street avenue boulevard drive lane court circle place plaza square
+terrace parkway highway expressway freeway trail crescent heights manor
+village way alley loop bend pike route path saint
+rue allee impasse chemin cours quai esplanade
+marg gali chowk
+""".split())
+
+UNIT_WORDS = frozenset("""
+apartment suite floor room unit building block number no nos door flat shop
+postoffice po box pmb ground groundfloor near opposite behind beside front
+back side plot khasra survey premises complex tower wing phase
+batiment residence lotissement bis ter
+""".split())
+
+# Landmark-anchored fragments ("Near SBI ATM") are pulled out of the address so
+# the remainder stays comparable; two records sharing a landmark is weak
+# evidence, so it is kept in its own field rather than discarded.
+LANDMARK_RE = re.compile(
+    r"\b(?:near|nr|opp|opposite|behind|beside|next to|adjacent to|"
+    r"in front of|back side of|backside of|above|below|beneath)\b")
+
+_US_STATES = {
+    "alabama": "al", "alaska": "ak", "arizona": "az", "arkansas": "ar",
+    "california": "ca", "colorado": "co", "connecticut": "ct", "delaware": "de",
+    "district of columbia": "dc", "florida": "fl", "georgia": "ga",
+    "hawaii": "hi", "idaho": "id", "illinois": "il", "indiana": "in",
+    "iowa": "ia", "kansas": "ks", "kentucky": "ky", "louisiana": "la",
+    "maine": "me", "maryland": "md", "massachusetts": "ma", "michigan": "mi",
+    "minnesota": "mn", "mississippi": "ms", "missouri": "mo", "montana": "mt",
+    "nebraska": "ne", "nevada": "nv", "new hampshire": "nh", "new jersey": "nj",
+    "new mexico": "nm", "new york": "ny", "north carolina": "nc",
+    "north dakota": "nd", "ohio": "oh", "oklahoma": "ok", "oregon": "or",
+    "pennsylvania": "pa", "rhode island": "ri", "south carolina": "sc",
+    "south dakota": "sd", "tennessee": "tn", "texas": "tx", "utah": "ut",
+    "vermont": "vt", "virginia": "va", "washington": "wa",
+    "west virginia": "wv", "wisconsin": "wi", "wyoming": "wy",
+    "puerto rico": "pr", "virgin islands": "vi", "guam": "gu",
+}
+_IN_STATES = {
+    "andhra pradesh": "ap", "arunachal pradesh": "ar", "assam": "as",
+    "bihar": "br", "chhattisgarh": "cg", "chattisgarh": "cg", "goa": "ga",
+    "gujarat": "gj", "haryana": "hr", "himachal pradesh": "hp",
+    "jharkhand": "jh", "karnataka": "ka", "kerala": "kl",
+    "madhya pradesh": "mp", "maharashtra": "mh", "manipur": "mn",
+    "meghalaya": "ml", "mizoram": "mz", "nagaland": "nl", "odisha": "od",
+    "orissa": "od", "punjab": "pb", "rajasthan": "rj", "sikkim": "sk",
+    "tamil nadu": "tn", "tamilnadu": "tn", "telangana": "ts", "tripura": "tr",
+    "uttar pradesh": "up", "uttarakhand": "uk", "uttaranchal": "uk",
+    "west bengal": "wb", "paschim banga": "wb", "pashchimbanga": "wb",
+    "delhi": "dl", "new delhi": "dl",
+    "jammu and kashmir": "jk", "ladakh": "la", "puducherry": "py",
+    "pondicherry": "py", "chandigarh": "ch",
+    "andaman and nicobar islands": "an", "lakshadweep": "ld",
+    "dadra and nagar haveli": "dn", "daman and diu": "dd",
+}
+# The 18 French regions. Departments vary far more in the data, so they are
+# mined with load_derived() rather than hard-coded from outside knowledge.
+_FR_REGIONS = {
+    "auvergne rhone alpes": "ara", "bourgogne franche comte": "bfc",
+    "bretagne": "bre", "centre val de loire": "cvl", "corse": "cor",
+    "grand est": "ges", "hauts de france": "hdf", "ile de france": "idf",
+    "normandie": "nor", "nouvelle aquitaine": "naq", "occitanie": "occ",
+    "pays de la loire": "pdl", "provence alpes cote d azur": "pac",
+    "guadeloupe": "gp", "martinique": "mq", "guyane": "gf",
+    "la reunion": "re", "mayotte": "yt",
+}
+
+
+def _with_codes(d):
+    out = dict(d)
+    for code in set(d.values()):
+        out.setdefault(code, code)
+    return out
+
+
+REGIONS_BY_COUNTRY = {
+    "US": _with_codes(_US_STATES),
+    "India": _with_codes(_IN_STATES),
+    "France": _with_codes(_FR_REGIONS),
+}
+
+# India uses a 6-digit PIN; US ZIP and French codes are both 5 digits, which
+# collide with 5-digit house numbers, so the *last* match wins (postcodes
+# trail, house numbers lead). Treat addr_postcode as evidence, not truth.
+POSTCODE_LEN = {"India": 6, "US": 5, "France": 5}
+
+
+def load_derived(country, path):
+    """Extend a country's region vocabulary from a mined file.
+
+    One entry per line, either ``name`` or ``name<TAB>code``. Mining this from
+    the dataset's own trailing address components keeps the geographic
+    vocabulary inside the provided data, which is what the fair-play rule
+    against external lookups requires.
+    """
+    table = REGIONS_BY_COUNTRY.setdefault(country, {})
+    added = 0
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            name, _, code = line.rstrip("\n").partition("\t")
+            name = name.strip().lower()
+            if name and name not in table:
+                table[name] = (code.strip() or name).lower()
+                added += 1
+    return added
+
+
+# ===========================================================================
+# PART 2 -- SHARED PRIMITIVES
+# ===========================================================================
+_APOSTROPHE = re.compile(r"['’ʼ`]")
+# Indic viramas and vowel signs are combining marks, which `\w` does NOT match;
+# a plain [^\w\s] strip silently tears Devanagari and Tamil words apart. The
+# Indic blocks are held out explicitly, with danda punctuation removed first.
+_INDIC_PUNCT = re.compile(r"[।॥]")
+_NONWORD = re.compile(r"[^\w\sऀ-෿]", re.UNICODE)
+_UNDERSCORE = re.compile(r"_+")
+_WS = re.compile(r"\s+")
+_LEADING_DASHES = re.compile(r"^[\s\-]+|[\s\-]+$")
+_ORDINAL = re.compile(r"(?<=\d)(?:st|nd|rd|th)\b")
+_LEADING_ZEROS = re.compile(r"\b0+(\d)")
+_NULL_TOKEN = re.compile(r"\b(?:null|none|nan|n\s*/\s*a|na)\b")
+_DOMAIN = re.compile(
+    r"^\s*(?:https?://)?(?:www\.)?([a-z0-9][a-z0-9\-]*(?:\.[a-z0-9\-]+)*)"
+    r"\.(?:com|net|org|info|biz|co|in|fr|us|io|shop|store)\s*$", re.I)
+_NUM = re.compile(r"\d+")
+_HAS_LETTER = re.compile(r"[^\W\d_]", re.UNICODE)
+
+
+def basic_clean(s):
+    """Fold, lower-case, strip punctuation noise, collapse whitespace.
+
+    Apostrophes close up rather than split ("Orelee's" -> "orelees"); every
+    other punctuation mark becomes a space, so "PAYNE-ENRTPRMISES" and
+    "Payne Enterprises" tokenise the same way. Ordinal suffixes and leading
+    zeros are removed so the same house number written three ways compares
+    equal ("45th", "45ND" -> "45"; "AF-0684" -> "af 684").
+    """
+    if not s:
+        return ""
+    s = fold_unicode(s)
+    s = _LEADING_DASHES.sub("", s)
+    s = s.lower()
+    s = s.replace("&", " and ")
+    s = _APOSTROPHE.sub("", s)
+    s = _INDIC_PUNCT.sub(" ", s)
+    s = _NONWORD.sub(" ", s)
+    s = _UNDERSCORE.sub(" ", s)
+    s = _ORDINAL.sub("", s)
+    s = _LEADING_ZEROS.sub(r"\1", s)
+    return _WS.sub(" ", s).strip()
+
+
+def _sorted_tokens(s):
+    return " ".join(sorted(set(s.split())))
+
+
+def _numbers(s):
+    return " ".join(sorted(set(_NUM.findall(s))))
+
+
+# Transliterated legal forms do not spell themselves the way English ones do --
+# the Devanagari for "private" romanises to "praaivet" -- so a token is also
+# matched against the legal vocabulary through its consonant skeleton, which is
+# invariant to exactly that kind of vowel drift.
+_LEGAL_WORDS = ("private", "limited", "company", "corporation", "incorporated")
+# Bengali and Odia have no distinct "v": they write it with the bh/b letter, so
+# "private" transliterates to a b-form and its skeleton comes out "prpt", not
+# "prvt". Each legal word is therefore registered under its v->b variant too.
+# This is deliberately scoped to legal-form detection rather than applied as a
+# global b/v merge, which would collapse unrelated names across the whole key.
+_CONS_LEGAL_REWRITE = {}
+for _w in _LEGAL_WORDS:
+    _CONS_LEGAL_REWRITE[consonant_skeleton(_w)] = _w
+    _CONS_LEGAL_REWRITE.setdefault(consonant_skeleton(_w.replace("v", "b")), _w)
+
+
+def _respell_legal(tokens):
+    out = []
+    for t in tokens:
+        if t in SUFFIX_TOKENS or len(t) < 4:
+            out.append(t)
+        else:
+            out.append(_CONS_LEGAL_REWRITE.get(consonant_skeleton(t), t))
+    return out
+
+
+# ===========================================================================
+# PART 3 -- COUNTRY
+# ===========================================================================
+# The README warns that `country` is an OPEN SET: training covers US and India,
+# the test set adds France, and more may follow. So unknown labels pass through
+# unchanged rather than being dropped or forced into a known bucket -- only
+# recognised aliases are canonicalised.
+COUNTRY_ALIASES = {
+    "us": "US", "usa": "US", "u s": "US", "u s a": "US", "united states": "US",
+    "united states of america": "US", "america": "US", "u s of a": "US",
+    "india": "India", "in": "India", "ind": "India", "bharat": "India",
+    "republic of india": "India",
+    "france": "France", "fr": "France", "fra": "France",
+    "french republic": "France", "republique francaise": "France",
+}
+CANONICAL_COUNTRIES = ("US", "India", "France")
+
+
+def normalize_country(raw):
+    """Canonical country label. Unrecognised labels are preserved verbatim."""
+    if not raw:
+        return ""
+    return COUNTRY_ALIASES.get(basic_clean(raw), raw.strip())
+
+
+# ===========================================================================
+# PART 4 -- NAMES
+# ===========================================================================
+NAME_FIELDS = ("name_norm", "name_core", "name_sorted", "name_nospace",
+               "name_acronym", "name_translit", "name_phon", "name_cons",
+               "name_legal", "name_nums", "name_script", "name_is_domain")
+
+
+def normalize_name(raw, country=""):
+    raw = raw or ""
+    script = script_of(raw)
+
+    # A record whose entire name is a domain ("wilfordhancock.com") is the
+    # website form of the business name; strip scheme and TLD, then let the
+    # nospace representation match it against the spaced-out name.
+    m = _DOMAIN.match(raw.strip())
+    is_domain = bool(m)
+    working = m.group(1).replace(".", " ") if m else raw
+
+    folded = fold_unicode(working)
+    translit = transliterate(folded)
+    norm = basic_clean(translit)
+
+    canon = " ".join(_respell_legal(norm.split()))
+    for rx, repl in LEGAL_FORMS_RE:
+        canon = rx.sub(repl, canon)
+    canon = _WS.sub(" ", canon).strip()
+
+    toks = canon.split()
+    core_toks = [t for t in toks if t not in SUFFIX_TOKENS]
+    legal = sorted({t for t in toks if t in SUFFIX_TOKENS})
+    if not core_toks:                    # name was nothing but legal forms
+        core_toks = toks
+    core = " ".join(core_toks)
+
+    return {
+        "name_norm": canon,
+        "name_core": core,
+        "name_sorted": _sorted_tokens(core),
+        "name_nospace": core.replace(" ", ""),
+        "name_acronym": "".join(t[0] for t in core_toks if t),
+        "name_translit": translit if script != "latin" else "",
+        "name_phon": phonetic(core),
+        "name_cons": consonant_skeleton(core),
+        "name_legal": " ".join(legal),
+        "name_nums": _numbers(norm),
+        "name_script": script,
+        "name_is_domain": "1" if is_domain else "0",
+    }
+
+
+# ===========================================================================
+# PART 5 -- ADDRESSES
+# ===========================================================================
+ADDR_FIELDS = ("addr_norm", "addr_core", "addr_sorted", "addr_cons",
+               "addr_nums", "addr_house", "addr_postcode", "addr_region",
+               "addr_locality", "addr_landmark", "addr_street")
+
+
+def _skel(s):
+    return consonant_skeleton(s).replace(" ", "")
+
+
+_REGION_SKEL_CACHE = {}
+
+
+def _region_skeletons(country):
+    """Consonant-skeleton index of a country's divisions, built on demand.
+
+    Keyed on the table's current size so a later load_derived() rebuild is
+    picked up rather than served stale.
+    """
+    table = REGIONS_BY_COUNTRY.get(country, {})
+    cached = _REGION_SKEL_CACHE.get(country)
+    if cached and cached[0] == len(table):
+        return cached[1]
+    idx = {}
+    for name, code in table.items():
+        if len(name) >= 4:                    # skip the 2-letter codes
+            k = _skel(name)
+            if len(k) >= 3:                   # too short collides
+                idx.setdefault(k, code)
+                idx.setdefault(k.replace("d", "t"), code)
+    _REGION_SKEL_CACHE[country] = (len(table), idx)
+    return idx
+
+
+def _canon_region(component, table, country=""):
+    """Canonical code for an address component, or None.
+
+    Punctuation-normalised first so "Hauts-de-France" reaches the table as
+    "hauts de france". Indic script survives that because its letters are word
+    characters and the Indic blocks are held out of the strip.
+
+    A non-ASCII component that misses is then retried through its consonant
+    skeleton: division names appear in this data in their own scripts, and
+    listing every spelling of every state in nine scripts by hand is both
+    error-prone and incomplete. Transliterating and comparing skeletons covers
+    all of them -- the Tamil and Devanagari spellings of "Tamil Nadu" both
+    reduce to "tmlnd". Restricted to non-ASCII input so Latin components cannot
+    collide with a state on a lossy key.
+    """
+    if not component:
+        return None
+    cand = basic_clean(component)
+    hit = table.get(cand) or table.get(cand.replace(" ", ""))
+    if hit:
+        return hit
+    if not component.isascii():
+        k = _skel(transliterate(fold_unicode(component)))
+        if len(k) >= 3:
+            index = _region_skeletons(country)
+            return index.get(k) or index.get(k.replace("d", "t"))
+    return None
+
+
+def normalize_address(raw, country=""):
+    raw = raw or ""
+    table = REGIONS_BY_COUNTRY.get(country, {})
+    abbrev = ABBREV_BY_COUNTRY.get(country, DEFAULT_ABBREV)
+
+    folded = fold_unicode(raw)
+
+    # Components are split before punctuation is destroyed: comma structure is
+    # the only positional signal in an address whose parts are often reordered.
+    parts = [p.strip() for p in folded.split(",")]
+    parts = [p for p in parts
+             if p and not _NULL_TOKEN.fullmatch(p.strip().lower())]
+
+    # Region: scanned from the tail over EVERY component, not just the last.
+    # Components here are freely reordered ("KANSAS CITY, MO, 630 45ND
+    # TERRACE"), so a position-based rule misses too often. A whole component
+    # must equal a known division for this to fire.
+    region = ""
+    for idx in range(len(parts) - 1, -1, -1):
+        code = _canon_region(parts[idx], table, country)
+        if code:
+            region = code
+            parts.pop(idx)
+            break
+
+    landmark, kept = [], []
+    for p in parts:
+        (landmark if LANDMARK_RE.search(p.lower()) else kept).append(p)
+
+    # Locality: the last ALL-ALPHABETIC component once the region is removed.
+    # "Last component" alone lands on a PIN code or a street line about as
+    # often as on the city.
+    locality = ""
+    for p in reversed(kept):
+        cleaned = basic_clean(transliterate(p))
+        if not cleaned:
+            continue
+        toks = cleaned.split()
+        if toks and not any(t.isdigit() for t in toks) and \
+                not all(t in STREET_TYPES or t in UNIT_WORDS for t in toks):
+            locality = cleaned
+            break
+    if not locality and kept:
+        locality = basic_clean(transliterate(kept[-1]))
+
+    norm = basic_clean(transliterate(" , ".join(kept)))
+    norm = _WS.sub(" ", _NULL_TOKEN.sub(" ", norm)).strip()
+
+    plen = POSTCODE_LEN.get(country, 0)
+    postcode = ""
+    if plen:
+        hits = re.findall(r"(?<!\d)(\d{%d})(?!\d)" % plen, norm)
+        if hits:
+            postcode = hits[-1]
+
+    expanded = [abbrev.get(t, t) for t in norm.split()]
+    core_toks = [t for t in expanded
+                 if t not in STREET_TYPES and t not in UNIT_WORDS
+                 and t != postcode]
+    # The region component is held out of the body so locality detection works,
+    # but its canonical CODE is folded back in: otherwise "Uttar Pradesh" and
+    # "UP" leave different cores, and a mined vocabulary that cannot tell a
+    # city from a department drops a token from one record of a pair only.
+    if region and region not in core_toks:
+        core_toks.append(region)
+    core = " ".join(core_toks)
+
+    house = next((t for t in expanded if t.isdigit()), "")
+
+    return {
+        "addr_norm": " ".join(expanded),
+        "addr_core": core,
+        "addr_sorted": _sorted_tokens(core),
+        "addr_cons": consonant_skeleton(
+            " ".join(t for t in core_toks if _HAS_LETTER.search(t))),
+        "addr_nums": " ".join(sorted({t for t in core_toks if t.isdigit()})),
+        "addr_house": house,
+        "addr_postcode": postcode,
+        "addr_region": region,
+        "addr_locality": locality,
+        "addr_landmark": basic_clean(transliterate(" ".join(landmark))),
+        "addr_street": " ".join(t for t in core_toks
+                                if not t.isdigit() and t != locality),
+    }
+
+
+ALL_FIELDS = ("country_norm",) + NAME_FIELDS + ADDR_FIELDS
+
+
+def normalize_record(name, address, country):
+    """Every representation for one record. Country is canonicalised first,
+    because the address tables are keyed by the canonical label."""
+    cc = normalize_country(country)
+    out = {"country_norm": cc}
+    out.update(normalize_name(name, cc))
+    out.update(normalize_address(address, cc))
+    return out
+
+
+# ===========================================================================
+# PART 6 -- PARALLEL DRIVER
+# ===========================================================================
+# ~24M rows over ~2.4GB, on a machine with well under 8GB usable RAM, so
+# nothing is ever held in memory: each worker takes a byte range, streams it,
+# and writes its own gzip part. Parallelism is by byte range rather than row
+# batch so no large payload is ever pickled between processes.
+OUT_COLUMNS = ("entity_id", "country") + ALL_FIELDS
+_SEP = "\t"
+_FLUSH_EVERY = 20_000
+
+
+def byte_ranges(path, n):
+    size = os.path.getsize(path)
+    if size == 0:
+        return []
+    step = max(1, size // n)
+    bounds = list(range(0, size, step))[:n] + [size]
+    return [(bounds[i], bounds[i + 1]) for i in range(len(bounds) - 1)
+            if bounds[i] < bounds[i + 1]]
+
+
+def _process_range(job):
+    """Normalise one byte range into one gzip part -> (part, rows, bad).
+
+    Binary I/O throughout: TextIOWrapper.tell() is far too slow to call once
+    per line, so the read position is tracked by accumulating line lengths.
+    """
+    src, start, end, part, compresslevel = job
+    rows = bad = 0
+    buf = []
+    append = buf.append
+    with open(src, "rb") as fh, gzip.open(part, "wb",
+                                          compresslevel=compresslevel) as out:
+        if start == 0:
+            fh.seek(0)
+            pos = len(fh.readline())       # skip the input header
+        else:
+            # A byte-range boundary can land exactly at the start of a row.
+            # Discard the first line only when it is actually partial.
+            fh.seek(start - 1)
+            ends_previous_line = fh.read(1) == b"\n"
+            fh.seek(start)
+            pos = start if ends_previous_line else start + len(fh.readline())
+        if start == 0:
+            append(_SEP.join(OUT_COLUMNS))
+        while pos < end:
+            raw = fh.readline()
+            if not raw:
+                break
+            pos += len(raw)
+            fields = raw.decode("utf-8").rstrip("\r\n").split(_SEP)
+            if len(fields) < 4:
+                bad += 1
+                continue
+            rec = normalize_record(fields[1], fields[2], fields[3])
+            append(fields[0] + _SEP + fields[3] + _SEP
+                   + _SEP.join(rec[c] for c in ALL_FIELDS))
+            rows += 1
+            if len(buf) >= _FLUSH_EVERY:
+                out.write(("\n".join(buf) + "\n").encode("utf-8"))
+                buf.clear()
+        if buf:
+            out.write(("\n".join(buf) + "\n").encode("utf-8"))
+    return part, rows, bad
+
+
+def normalize_file(src, out_dir, workers=None, compresslevel=1):
+    workers = workers or max(1, os.cpu_count() or 4)
+    os.makedirs(out_dir, exist_ok=True)
+    stem = os.path.splitext(os.path.basename(src))[0]
+    jobs = [(src, s, e, os.path.join(out_dir, f"{stem}.part-{i:02d}.tsv.gz"),
+             compresslevel)
+            for i, (s, e) in enumerate(byte_ranges(src, workers))]
+    t0 = time.time()
+    with mp.Pool(len(jobs)) as pool:
+        results = pool.map(_process_range, jobs)
+    # Re-running with fewer workers leaves surplus parts from the earlier run.
+    # Retire them only after all new parts were written successfully.
+    current_parts = {os.path.abspath(p) for p, _, _ in results}
+    stale_pattern = re.compile(r"^" + re.escape(stem) + r"\.part-\d+\.tsv\.gz$")
+    for name in os.listdir(out_dir):
+        if stale_pattern.fullmatch(name):
+            path = os.path.abspath(os.path.join(out_dir, name))
+            if path not in current_parts:
+                os.remove(path)
+    dt = time.time() - t0
+    rows = sum(r for _, r, _ in results)
+    return {"source": os.path.basename(src),
+            "parts": [p for p, _, _ in results], "rows": rows,
+            "malformed": sum(b for _, _, b in results),
+            "seconds": round(dt, 1),
+            "rows_per_sec": round(rows / dt) if dt else 0}
+
+
+def iter_normalized(parts):
+    """Stream normalised rows back as dicts, in part order."""
+    header = None
+    for i, part in enumerate(parts):
+        with gzip.open(part, "rt", encoding="utf-8", newline="") as fh:
+            if i == 0:
+                header = fh.readline().rstrip("\n").split(_SEP)
+            for line in fh:
+                yield dict(zip(header, line.rstrip("\n").split(_SEP)))
+
+
+# ===========================================================================
+# PART 7 -- VALIDATION / REPORT
+# ===========================================================================
+LIFT_KEYS = ("name_raw", "name_norm", "name_core", "name_sorted",
+             "name_nospace", "name_phon", "name_cons", "name_acronym",
+             "addr_raw", "addr_norm", "addr_core", "addr_sorted", "addr_cons",
+             "addr_house", "addr_postcode", "addr_region", "addr_locality",
+             "name_cons+addr_house", "name_cons+addr_locality")
+
+
+def load_clusters(gt_path, n_clusters, skip_singletons=True):
+    clusters = {}
+    with open(gt_path, encoding="utf-8") as fh:
+        fh.readline()
+        for line in fh:
+            s1, _, rest = line.rstrip("\n").partition("\t")
+            ids = [x for x in rest.split(",") if x]
+            if skip_singletons and not ids:
+                continue
+            clusters[s1] = ids
+            if len(clusters) >= n_clusters:
+                break
+    return clusters
+
+
+def collect_records(paths, wanted):
+    """One streaming pass per file, keeping only the ids we need."""
+    found = {}
+    for path in paths:
+        with open(path, encoding="utf-8", newline="") as fh:
+            fh.readline()
+            for line in fh:
+                eid, _, rest = line.rstrip("\r\n").partition("\t")
+                if eid in wanted:
+                    p = rest.split("\t")
+                    if len(p) >= 3:
+                        found[eid] = (p[0], p[1], p[2])
+    return found
+
+
+def _keys_for(rec):
+    name, address, country = rec
+    d = normalize_record(name, address, country)
+    d["name_raw"] = name.strip().lower()
+    d["addr_raw"] = address.strip().lower()
+    d["name_cons+addr_house"] = d["name_cons"] + "|" + d["addr_house"]
+    d["name_cons+addr_locality"] = d["name_cons"] + "|" + d["addr_locality"]
+    return d
+
+
+def validate_lift(data_dir, n_clusters=8000, seed=0):
+    """Hit rate on true pairs vs a random-pair control, per representation.
+
+    A representation earns its place only if true matches agree on it far more
+    often than random records do. The `raw` rows are the untouched inputs, so
+    the value of normalising is the gap between them and their counterparts.
+    """
+    gt = os.path.join(data_dir, "train_ground_truth.tsv")
+    clusters = load_clusters(gt, n_clusters)
+    wanted = set(clusters)
+    for ids in clusters.values():
+        wanted.update(ids)
+    paths = [os.path.join(data_dir, f"train_source{i}.tsv") for i in (1, 2, 3)]
+    records = collect_records(paths, wanted)
+
+    rng = random.Random(seed)
+    keyed = {e: _keys_for(r) for e, r in records.items()}
+    pool = [i for i in keyed if not i.startswith("S1-")]
+    hit = Counter()
+    fp = Counter()
+    n_pairs = n_rand = 0
+
+    for s1, ids in clusters.items():
+        a = keyed.get(s1)
+        if a is None:
+            continue
+        for mid in ids:
+            b = keyed.get(mid)
+            if b is None:
+                continue
+            n_pairs += 1
+            for k in LIFT_KEYS:
+                if a.get(k) and a.get(k) == b.get(k):
+                    hit[k] += 1
+        for _ in range(len(ids)):
+            if not pool:
+                break
+            rid = rng.choice(pool)
+            if rid in ids or rid not in keyed:
+                continue
+            n_rand += 1
+            b = keyed[rid]
+            for k in LIFT_KEYS:
+                if a.get(k) and a.get(k) == b.get(k):
+                    fp[k] += 1
+
+    return {
+        "true_pairs": n_pairs, "random_pairs": n_rand,
+        "records_resolved": len(records), "records_requested": len(wanted),
+        "keys": {k: {"hit_pct": round(100 * hit[k] / n_pairs, 3) if n_pairs else 0,
+                     "fp_pct": round(100 * fp[k] / n_rand, 4) if n_rand else 0}
+                 for k in LIFT_KEYS},
+    }
+
+
+def build_report(project_dir, out_path, sample_rows=None, n_clusters=8000):
+    """Assemble normalization_report.json."""
+    data = os.path.join(project_dir, "dataset")
+    srcs = [os.path.join(data, "train", f"train_source{i}.tsv") for i in (1, 2, 3)]
+    srcs += [os.path.join(data, "test", f"test_source{i}.tsv") for i in (1, 2, 3)]
+    srcs = [p for p in srcs if os.path.exists(p)]
+
+    report = {
+        "generated": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "scripts_supported": list(script_of.__globals__["ALL_SCRIPTS"]),
+        "output_columns": list(OUT_COLUMNS),
+        "script_distribution": script_distribution(srcs, limit_rows=sample_rows),
+        "validation_lift": validate_lift(os.path.join(data, "train"), n_clusters),
+    }
+    with open(out_path, "w", encoding="utf-8") as fh:
+        json.dump(report, fh, indent=2, ensure_ascii=False)
+    return report
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--in", dest="src", nargs="+")
+    ap.add_argument("--out", dest="out_dir")
+    ap.add_argument("--workers", type=int, default=os.cpu_count())
+    ap.add_argument("--compresslevel", type=int, default=1)
+    ap.add_argument("--report", metavar="PATH")
+    ap.add_argument("--sample-rows", type=int, default=None)
+    ap.add_argument("--clusters", type=int, default=8000)
+    args = ap.parse_args(argv)
+
+    if args.src and args.out_dir:
+        for src in args.src:
+            info = normalize_file(src, args.out_dir, args.workers,
+                                  args.compresslevel)
+            print(f"{info['source']:26} {info['rows']:>9,} rows  "
+                  f"{info['seconds']:>7.1f}s  {info['rows_per_sec']:>9,} rows/s "
+                  f" malformed={info['malformed']}")
+    if args.report:
+        project = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        rep = build_report(project, args.report, args.sample_rows, args.clusters)
+        print(f"wrote {args.report}")
+        for f, e in rep["script_distribution"].items():
+            print(f"  {f:24} {e['rows']:>9,} rows  {e['pct']}")
+
+
+if __name__ == "__main__":
+    main()

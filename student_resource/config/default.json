@@ -1,0 +1,11 @@
+{
+  "name_k": 30,
+  "address_k": 30,
+  "skeleton_k": 20,
+  "global_name_k": 5,
+  "exact_bucket_limit": 100,
+  "query_terms": 16,
+  "max_candidates": 0,
+  "lsh_bands": 8,
+  "lsh_bucket_limit": 2000
+}

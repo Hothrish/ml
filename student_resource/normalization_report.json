@@ -1,0 +1,376 @@
+{
+  "generated": "2026-09-25T16:41:54",
+  "scripts_supported": [
+    "latin",
+    "deva",
+    "beng",
+    "guru",
+    "gujr",
+    "orya",
+    "taml",
+    "telu",
+    "knda",
+    "mlym",
+    "mixed",
+    "other"
+  ],
+  "output_columns": [
+    "entity_id",
+    "country",
+    "country_norm",
+    "name_norm",
+    "name_core",
+    "name_sorted",
+    "name_nospace",
+    "name_acronym",
+    "name_translit",
+    "name_phon",
+    "name_cons",
+    "name_legal",
+    "name_nums",
+    "name_script",
+    "name_is_domain",
+    "addr_norm",
+    "addr_core",
+    "addr_sorted",
+    "addr_cons",
+    "addr_nums",
+    "addr_house",
+    "addr_postcode",
+    "addr_region",
+    "addr_locality",
+    "addr_landmark",
+    "addr_street"
+  ],
+  "script_distribution": {
+    "train_source1.tsv": {
+      "rows": 2206821,
+      "counts": {
+        "latin": 2206821
+      },
+      "pct": {
+        "latin": 100.0
+      },
+      "by_country": {
+        "India": {
+          "latin": 883188
+        },
+        "US": {
+          "latin": 1323633
+        }
+      }
+    },
+    "train_source2.tsv": {
+      "rows": 5034616,
+      "counts": {
+        "latin": 4560077,
+        "deva": 258863,
+        "telu": 37799,
+        "knda": 35787,
+        "taml": 32440,
+        "gujr": 29700,
+        "beng": 29497,
+        "mixed": 18586,
+        "mlym": 18062,
+        "orya": 7194,
+        "guru": 6417,
+        "other": 194
+      },
+      "pct": {
+        "latin": 90.5745,
+        "deva": 5.1417,
+        "telu": 0.7508,
+        "knda": 0.7108,
+        "taml": 0.6443,
+        "gujr": 0.5899,
+        "beng": 0.5859,
+        "mixed": 0.3692,
+        "mlym": 0.3588,
+        "orya": 0.1429,
+        "guru": 0.1275,
+        "other": 0.0039
+      },
+      "by_country": {
+        "India": {
+          "latin": 1543454,
+          "deva": 258863,
+          "telu": 37799,
+          "knda": 35787,
+          "taml": 32440,
+          "gujr": 29700,
+          "beng": 29497,
+          "mixed": 18586,
+          "mlym": 18062,
+          "orya": 7194,
+          "guru": 6417
+        },
+        "US": {
+          "latin": 3016623,
+          "other": 194
+        }
+      }
+    },
+    "train_source3.tsv": {
+      "rows": 5285603,
+      "counts": {
+        "latin": 5006656,
+        "deva": 138187,
+        "mixed": 34894,
+        "telu": 20088,
+        "knda": 19254,
+        "taml": 17346,
+        "beng": 15863,
+        "gujr": 15746,
+        "mlym": 9759,
+        "orya": 3781,
+        "guru": 3606,
+        "other": 423
+      },
+      "pct": {
+        "latin": 94.7225,
+        "deva": 2.6144,
+        "mixed": 0.6602,
+        "telu": 0.3801,
+        "knda": 0.3643,
+        "taml": 0.3282,
+        "beng": 0.3001,
+        "gujr": 0.2979,
+        "mlym": 0.1846,
+        "orya": 0.0715,
+        "guru": 0.0682,
+        "other": 0.008
+      },
+      "by_country": {
+        "India": {
+          "latin": 1837023,
+          "deva": 138187,
+          "mixed": 34894,
+          "telu": 20088,
+          "knda": 19254,
+          "taml": 17346,
+          "beng": 15863,
+          "gujr": 15746,
+          "mlym": 9759,
+          "orya": 3781,
+          "guru": 3606
+        },
+        "US": {
+          "latin": 3169633,
+          "other": 423
+        }
+      }
+    },
+    "test_source1.tsv": {
+      "rows": 1732544,
+      "counts": {
+        "latin": 1732544
+      },
+      "pct": {
+        "latin": 100.0
+      },
+      "by_country": {
+        "France": {
+          "latin": 259452
+        },
+        "India": {
+          "latin": 809986
+        },
+        "US": {
+          "latin": 663106
+        }
+      }
+    },
+    "test_source2.tsv": {
+      "rows": 4887273,
+      "counts": {
+        "latin": 4340556,
+        "deva": 297604,
+        "telu": 43403,
+        "knda": 42256,
+        "taml": 37458,
+        "beng": 34207,
+        "gujr": 34018,
+        "mlym": 21154,
+        "mixed": 20556,
+        "orya": 8332,
+        "guru": 7618,
+        "other": 111
+      },
+      "pct": {
+        "latin": 88.8135,
+        "deva": 6.0894,
+        "telu": 0.8881,
+        "knda": 0.8646,
+        "taml": 0.7664,
+        "beng": 0.6999,
+        "gujr": 0.6961,
+        "mlym": 0.4328,
+        "mixed": 0.4206,
+        "orya": 0.1705,
+        "guru": 0.1559,
+        "other": 0.0023
+      },
+      "by_country": {
+        "France": {
+          "latin": 703368,
+          "other": 10
+        },
+        "India": {
+          "latin": 1765959,
+          "deva": 297604,
+          "telu": 43403,
+          "knda": 42256,
+          "taml": 37458,
+          "beng": 34207,
+          "gujr": 34018,
+          "mlym": 21154,
+          "mixed": 20556,
+          "orya": 8332,
+          "guru": 7618
+        },
+        "US": {
+          "latin": 1871229,
+          "other": 101
+        }
+      }
+    },
+    "test_source3.tsv": {
+      "rows": 5082316,
+      "counts": {
+        "latin": 4761439,
+        "deva": 158605,
+        "mixed": 39860,
+        "telu": 23268,
+        "knda": 22706,
+        "taml": 19994,
+        "beng": 18297,
+        "gujr": 17921,
+        "mlym": 11471,
+        "orya": 4456,
+        "guru": 4061,
+        "other": 238
+      },
+      "pct": {
+        "latin": 93.6864,
+        "deva": 3.1207,
+        "mixed": 0.7843,
+        "telu": 0.4578,
+        "knda": 0.4468,
+        "taml": 0.3934,
+        "beng": 0.36,
+        "gujr": 0.3526,
+        "mlym": 0.2257,
+        "orya": 0.0877,
+        "guru": 0.0799,
+        "other": 0.0047
+      },
+      "by_country": {
+        "France": {
+          "latin": 731604,
+          "other": 11
+        },
+        "India": {
+          "latin": 2084361,
+          "deva": 158605,
+          "mixed": 39860,
+          "telu": 23268,
+          "knda": 22706,
+          "taml": 19994,
+          "beng": 18297,
+          "gujr": 17921,
+          "mlym": 11471,
+          "orya": 4456,
+          "guru": 4061
+        },
+        "US": {
+          "latin": 1945474,
+          "other": 227
+        }
+      }
+    }
+  },
+  "validation_lift": {
+    "true_pairs": 29206,
+    "random_pairs": 29204,
+    "records_resolved": 37206,
+    "records_requested": 37206,
+    "keys": {
+      "name_raw": {
+        "hit_pct": 10.652,
+        "fp_pct": 0.0
+      },
+      "name_norm": {
+        "hit_pct": 29.552,
+        "fp_pct": 0.0
+      },
+      "name_core": {
+        "hit_pct": 45.819,
+        "fp_pct": 0.0
+      },
+      "name_sorted": {
+        "hit_pct": 49.267,
+        "fp_pct": 0.0
+      },
+      "name_nospace": {
+        "hit_pct": 48.726,
+        "fp_pct": 0.0
+      },
+      "name_phon": {
+        "hit_pct": 46.151,
+        "fp_pct": 0.0
+      },
+      "name_cons": {
+        "hit_pct": 49.647,
+        "fp_pct": 0.0
+      },
+      "name_acronym": {
+        "hit_pct": 60.07,
+        "fp_pct": 0.1233
+      },
+      "addr_raw": {
+        "hit_pct": 7.118,
+        "fp_pct": 0.0
+      },
+      "addr_norm": {
+        "hit_pct": 29.141,
+        "fp_pct": 0.0
+      },
+      "addr_core": {
+        "hit_pct": 31.0,
+        "fp_pct": 0.0
+      },
+      "addr_sorted": {
+        "hit_pct": 41.896,
+        "fp_pct": 0.0
+      },
+      "addr_cons": {
+        "hit_pct": 45.799,
+        "fp_pct": 0.0
+      },
+      "addr_house": {
+        "hit_pct": 69.739,
+        "fp_pct": 0.2226
+      },
+      "addr_postcode": {
+        "hit_pct": 5.002,
+        "fp_pct": 0.0
+      },
+      "addr_region": {
+        "hit_pct": 93.631,
+        "fp_pct": 3.5577
+      },
+      "addr_locality": {
+        "hit_pct": 65.921,
+        "fp_pct": 0.2191
+      },
+      "name_cons+addr_house": {
+        "hit_pct": 36.674,
+        "fp_pct": 0.0
+      },
+      "name_cons+addr_locality": {
+        "hit_pct": 32.671,
+        "fp_pct": 0.0
+      }
+    }
+  }
+}

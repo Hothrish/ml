@@ -1,0 +1,37 @@
+{
+  "initial_1000": {
+    "s1_records": 1000,
+    "candidate_pairs": 168131,
+    "matches": 3175,
+    "new_s1_this_run": 1000,
+    "seconds_this_run": 90.375,
+    "partial": true,
+    "split": "test"
+  },
+  "optimized_1000": {
+    "s1_records": 1000,
+    "candidate_pairs": 168131,
+    "matches": 3175,
+    "new_s1_this_run": 1000,
+    "seconds_this_run": 26.436999999918044,
+    "partial": true,
+    "split": "test"
+  },
+  "optimized_5000": {
+    "s1_records": 5000,
+    "candidate_pairs": 840210,
+    "matches": 15803,
+    "new_s1_this_run": 5000,
+    "seconds_this_run": 182.85900000017136,
+    "partial": true,
+    "split": "test"
+  },
+  "workers": 8,
+  "exact_output_parity_1000": true,
+  "sha256": {
+    "candidate_pairs.tsv": "675cff1e01201a6aa88c3e71fc82199c23834bf5a7ff9ada63a734dce5b32981",
+    "matching_results.tsv": "2f182976a47abf600e166d5844db0a985b381863f83562602364855a456061b3"
+  },
+  "estimated_full_hours_at_5000_rate": 17.60062573866667,
+  "limitations": "Benchmark uses the first 5000 test S1 records; country mix, caching, disk load and thermal conditions can change full runtime."
+}

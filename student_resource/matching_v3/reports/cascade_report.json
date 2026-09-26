@@ -1,0 +1,92 @@
+{
+  "threshold": 0.0001,
+  "calibration_trials": [
+    {
+      "threshold": 1e-05,
+      "fraction_to_full_model": 0.9280968316324056,
+      "true_pairs_lost": 0,
+      "full_model_positive_pairs_lost": 0
+    },
+    {
+      "threshold": 3e-05,
+      "fraction_to_full_model": 0.6479345217887339,
+      "true_pairs_lost": 0,
+      "full_model_positive_pairs_lost": 0
+    },
+    {
+      "threshold": 0.0001,
+      "fraction_to_full_model": 0.3176681701343421,
+      "true_pairs_lost": 0,
+      "full_model_positive_pairs_lost": 0
+    },
+    {
+      "threshold": 0.0003,
+      "fraction_to_full_model": 0.10896330014618971,
+      "true_pairs_lost": 5,
+      "full_model_positive_pairs_lost": 0
+    },
+    {
+      "threshold": 0.001,
+      "fraction_to_full_model": 0.05081074090240393,
+      "true_pairs_lost": 20,
+      "full_model_positive_pairs_lost": 4
+    },
+    {
+      "threshold": 0.003,
+      "fraction_to_full_model": 0.03825643939131499,
+      "true_pairs_lost": 36,
+      "full_model_positive_pairs_lost": 7
+    },
+    {
+      "threshold": 0.01,
+      "fraction_to_full_model": 0.03150122748551382,
+      "true_pairs_lost": 52,
+      "full_model_positive_pairs_lost": 16
+    },
+    {
+      "threshold": 0.03,
+      "fraction_to_full_model": 0.026501215938143044,
+      "true_pairs_lost": 90,
+      "full_model_positive_pairs_lost": 36
+    },
+    {
+      "threshold": 0.05,
+      "fraction_to_full_model": 0.024401903930494066,
+      "true_pairs_lost": 131,
+      "full_model_positive_pairs_lost": 56
+    },
+    {
+      "threshold": 0.1,
+      "fraction_to_full_model": 0.02217557084427447,
+      "true_pairs_lost": 208,
+      "full_model_positive_pairs_lost": 101
+    },
+    {
+      "threshold": 0.2,
+      "fraction_to_full_model": 0.01729334247885099,
+      "true_pairs_lost": 489,
+      "full_model_positive_pairs_lost": 258
+    }
+  ],
+  "audit": {
+    "macro_f0_5": 0.9467387533390624,
+    "query_count": 2000,
+    "true_positives": 6066,
+    "false_positives": 72,
+    "false_negatives": 815,
+    "micro_precision": 0.9882697947214076,
+    "micro_recall": 0.881557913094027
+  },
+  "audit_fraction_to_full_model": 0.30826788710063974,
+  "audit_full_model_positive_pairs_lost": 0,
+  "v2_same_audit": {
+    "macro_f0_5": 0.9106358784926168,
+    "query_count": 2000,
+    "true_positives": 5743,
+    "false_positives": 213,
+    "false_negatives": 1138,
+    "micro_precision": 0.9642377434519812,
+    "micro_recall": 0.834617061473623
+  },
+  "seconds": 14.686999999918044
+}

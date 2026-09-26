@@ -1,0 +1,58 @@
+{
+  "model": "LightGBM with name/address comparison and native edit-distance features",
+  "fit_s1": 2100,
+  "calibration_s1": 450,
+  "audit_s1": 450,
+  "fit_pairs": 349054,
+  "fit_positive_pairs": 6569,
+  "threshold": 0.56,
+  "calibration_macro_f0_5": 0.9029065763772512,
+  "trials": [
+    {
+      "leaves": 15,
+      "best_iteration": 507,
+      "calibration_macro_f0_5": 0.9012258781961039,
+      "threshold": 0.59
+    },
+    {
+      "leaves": 31,
+      "best_iteration": 190,
+      "calibration_macro_f0_5": 0.9029065763772512,
+      "threshold": 0.56
+    }
+  ],
+  "audit": {
+    "macro_f0_5": 0.9035247302726306,
+    "query_count": 450,
+    "true_positives": 1320,
+    "false_positives": 54,
+    "false_negatives": 214,
+    "micro_precision": 0.9606986899563319,
+    "micro_recall": 0.8604954367666232
+  },
+  "audit_by_country": {
+    "India": {
+      "macro_f0_5": 0.8615896035155113,
+      "query_count": 173,
+      "true_positives": 473,
+      "false_positives": 36,
+      "false_negatives": 99,
+      "micro_precision": 0.9292730844793713,
+      "micro_recall": 0.8269230769230769
+    },
+    "US": {
+      "macro_f0_5": 0.9297152607021673,
+      "query_count": 277,
+      "true_positives": 847,
+      "false_positives": 18,
+      "false_negatives": 115,
+      "micro_precision": 0.9791907514450867,
+      "micro_recall": 0.8804573804573804
+    }
+  },
+  "seconds": 147.43799999984913,
+  "limitations": [
+    "This training-data audit is small and is not a test leaderboard score.",
+    "France has no labeled training examples."
+  ]
+}

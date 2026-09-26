@@ -1,0 +1,19 @@
+{
+  "status": "PASS",
+  "audit_queries": 450,
+  "checks": [
+    "Serialized model reproduces every audit prediction with eight Windows workers",
+    "Candidate lists match the previous pipeline",
+    "Every predicted match is a scored candidate",
+    "S1 fit, calibration and audit splits are disjoint"
+  ],
+  "audit_run": {
+    "s1_records": 450,
+    "candidate_pairs": 75003,
+    "matches": 1374,
+    "new_s1_this_run": 450,
+    "seconds_this_run": 31.686999999918044,
+    "partial": true,
+    "split": "train"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "s1_records": 10000,
+  "candidate_pairs": 2183689,
+  "matches": 31621,
+  "new_s1_this_run": 10000,
+  "seconds_this_run": 136.7970000000205,
+  "partial": true,
+  "split": "test"
+}

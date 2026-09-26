@@ -1,0 +1,8 @@
+{
+  "pairs": 1000,
+  "repeats": 10,
+  "direct_idf_seconds": 0.055267000105232,
+  "sparse_csr_build_and_score_seconds": 0.08694529999047518,
+  "equivalent_cosines": true,
+  "scope": "Pairwise feature calculation only. Does not measure a prebuilt full-corpus sparse retrieval index."
+}

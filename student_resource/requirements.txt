@@ -1,0 +1,3 @@
+# Python 3.10 or later, standard library only.
+# SQLite supplied with Python must include FTS5; run the doctor command.
+# No pip packages or external data/services are required.
